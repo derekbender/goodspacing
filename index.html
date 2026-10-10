@@ -104,7 +104,9 @@
   const OVERLAP = 0.269;  // share of the narrower letter's width that overlaps at rest
   const OFFSCREEN = 0.5;  // share of each letter's width that drifts past the screen edge
   const APART_MS = 2600;
-  const TOGETHER_MS = 900;
+  const TOGETHER_MS = 900;  // linear, so the letters hit at full speed
+  const IMPACT_MS = 450;     // squash-and-rebound after the letters collide
+  const IMPACT_DEPTH = 0.05; // how far each letter pushes into the other, × font size
 
   const root = document.documentElement;
   const svg = document.getElementById('stage');
@@ -116,6 +118,7 @@
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
 
   let gx = 0, sx = 0, gMax = 0, sMax = 0, d = 0, raf = 0; // d: 0 together → 1 apart
+  let size = 0, bump = 0; // bump: extra outward offset (px) during the impact wobble
 
   function letterSize(w, h) {
     let size = SIZES[SIZES.length - 1][1];
@@ -135,7 +138,7 @@
       el.setAttribute('width', w * 3); el.setAttribute('height', h * 3);
     }
 
-    const size = letterSize(w, h);
+    size = letterSize(w, h);
     for (const t of [g, s]) { t.setAttribute('font-size', size); t.setAttribute('x', 0); t.setAttribute('y', 0); }
     const gb = g.getBBox(), sb = s.getBBox();
     const overlap = Math.min(gb.width, sb.width) * OVERLAP;
@@ -160,25 +163,42 @@
   }
 
   function place() {
-    g.setAttribute('x', gx - d * gMax);
-    s.setAttribute('x', sx + d * sMax);
+    g.setAttribute('x', gx - d * gMax - bump);
+    s.setAttribute('x', sx + d * sMax + bump);
   }
 
   // Tween from wherever the letters are now, so interrupted moves stay smooth
-  function moveTo(target, ms) {
+  function moveTo(target, ms, curve, onDone) {
     cancelAnimationFrame(raf);
+    bump = 0;
     const from = d, t0 = performance.now();
     const dur = reduced.matches ? 0 : ms * Math.abs(target - from);
     const step = now => {
       const t = dur ? Math.min(1, (now - t0) / dur) : 1;
-      d = from + (target - from) * ease(t);
+      d = from + (target - from) * curve(t);
+      place();
+      if (t < 1) raf = requestAnimationFrame(step);
+      else if (onDone && dur) onDone(now);
+    };
+    raf = requestAnimationFrame(step);
+  }
+
+  // Collision: the letters keep moving into each other briefly, then spring back
+  // with a small decaying wobble. Starts inward so it continues the incoming motion.
+  function impact(t0) {
+    const depth = size * IMPACT_DEPTH;
+    const step = now => {
+      const t = Math.min(1, (now - t0) / IMPACT_MS);
+      bump = t < 1 ? -depth * Math.exp(-5 * t) * Math.sin(3 * Math.PI * t) : 0;
       place();
       if (t < 1) raf = requestAnimationFrame(step);
     };
     raf = requestAnimationFrame(step);
   }
-  const apart = () => moveTo(1, APART_MS);
-  const together = () => moveTo(0, TOGETHER_MS);
+
+  const apart = () => moveTo(1, APART_MS, ease);
+  // Skip the impact if the letters had barely separated
+  const together = () => moveTo(0, TOGETHER_MS, t => t, d > 0.03 ? impact : null);
 
   // Mouse: hover drifts. Touch: press and hold drifts, a quick tap swaps colours.
   // Keyboard: focusing the letters drifts, Enter/Space swaps colours.
