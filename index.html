@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Good Spacing</title>
+<meta name="description" content="Good Spacing">
+<meta name="theme-color" content="#f4f2ee">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Ultra&display=block" rel="stylesheet">
+<style>
+  :root {
+    --ink: #1a1918;
+    --paper: #f4f2ee;
+    --swap: 700ms cubic-bezier(.65, 0, .35, 1);
+  }
+  :root.inverted { --ink: #f4f2ee; --paper: #1a1918; }
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  body {
+    background: var(--paper);
+    transition: background-color var(--swap);
+    -webkit-tap-highlight-color: transparent;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+  svg {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    transition: opacity 900ms ease;
+  }
+  svg.ready { opacity: 1; }
+  .letter { fill: var(--ink); transition: fill var(--swap); pointer-events: none; }
+  #hit { fill: transparent; pointer-events: all; touch-action: none; }
+</style>
+</head>
+<body>
+<svg id="stage" role="img" aria-label="Good Spacing">
+  <defs>
+    <text id="g" font-family="Ultra" font-size="100">G</text>
+    <text id="s" font-family="Ultra" font-size="100">S</text>
+    <mask id="not-g" maskUnits="userSpaceOnUse">
+      <rect class="mask-bg" fill="#fff"/><use href="#g" fill="#000"/>
+    </mask>
+    <mask id="not-s" maskUnits="userSpaceOnUse">
+      <rect class="mask-bg" fill="#fff"/><use href="#s" fill="#000"/>
+    </mask>
+  </defs>
+  <!-- Each letter is masked by the other, so the overlap shows the background -->
+  <use class="letter" href="#g" mask="url(#not-s)"/>
+  <use class="letter" href="#s" mask="url(#not-g)"/>
+  <rect id="hit"/>
+</svg>
+<script>
+(() => {
+  const OVERLAP = 0.13;   // share of the narrower letter's width that overlaps at rest
+  const GAP = 0.14;       // extra space each letter drifts past touching, × font size
+  const APART_MS = 1600;
+  const TOGETHER_MS = 750;
+
+  const svg = document.getElementById('stage');
+  const g = document.getElementById('g');
+  const s = document.getElementById('s');
+  const hit = document.getElementById('hit');
+  const ease = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+
+  let gx = 0, sx = 0, maxD = 0, d = 0, raf = 0;
+
+  function layout() {
+    const w = innerWidth, h = innerHeight;
+    svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+    for (const r of svg.querySelectorAll('.mask-bg')) {
+      r.setAttribute('x', -w); r.setAttribute('y', -h);
+      r.setAttribute('width', w * 3); r.setAttribute('height', h * 3);
+    }
+    for (const m of svg.querySelectorAll('mask')) {
+      m.setAttribute('x', -w); m.setAttribute('y', -h);
+      m.setAttribute('width', w * 3); m.setAttribute('height', h * 3);
+    }
+
+    const size = Math.min(w * 0.34, h * 0.42);
+    for (const t of [g, s]) { t.setAttribute('font-size', size); t.setAttribute('x', 0); t.setAttribute('y', 0); }
+    const gb = g.getBBox(), sb = s.getBBox();
+    const overlap = Math.min(gb.width, sb.width) * OVERLAP;
+    const total = gb.width + sb.width - overlap;
+    const left = (w - total) / 2;
+    const baseline = h / 2 - (gb.y + gb.height / 2);
+
+    gx = left - gb.x;
+    sx = left + gb.width - overlap - sb.x;
+    maxD = overlap / 2 + size * GAP;
+    g.setAttribute('y', baseline);
+    s.setAttribute('y', baseline);
+
+    hit.setAttribute('x', left);
+    hit.setAttribute('y', h / 2 - gb.height / 2);
+    hit.setAttribute('width', total);
+    hit.setAttribute('height', gb.height);
+    place();
+  }
+
+  function place() {
+    g.setAttribute('x', gx - d);
+    s.setAttribute('x', sx + d);
+  }
+
+  // Tween from wherever the letters are now, so interrupted moves stay smooth
+  function moveTo(target, ms) {
+    cancelAnimationFrame(raf);
+    const from = d, t0 = performance.now();
+    const dur = reduced.matches ? 0 : ms * Math.abs(target - from) / (maxD || 1);
+    const step = now => {
+      const t = dur ? Math.min(1, (now - t0) / dur) : 1;
+      d = from + (target - from) * ease(t);
+      place();
+      if (t < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+  }
+  const apart = () => moveTo(maxD, APART_MS);
+  const together = () => moveTo(0, TOGETHER_MS);
+
+  // Mouse: hover drifts. Touch: press and hold drifts, a quick tap swaps colours.
+  let pressStart = 0, held = false;
+  hit.addEventListener('pointerenter', e => { if (e.pointerType === 'mouse') apart(); });
+  hit.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') together(); });
+  hit.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'mouse') return;
+    pressStart = performance.now();
+    held = true;
+    apart();
+  });
+  const release = () => {
+    if (!held) return;
+    held = false;
+    together();
+  };
+  addEventListener('pointerup', release);
+  addEventListener('pointercancel', release);
+  addEventListener('contextmenu', e => e.preventDefault());
+
+  addEventListener('click', e => {
+    if (pressStart && performance.now() - pressStart > 300) { pressStart = 0; return; }
+    pressStart = 0;
+    const root = document.documentElement;
+    root.classList.toggle('inverted');
+    document.querySelector('meta[name=theme-color]').content =
+      root.classList.contains('inverted') ? '#1a1918' : '#f4f2ee';
+  });
+
+  addEventListener('resize', () => { layout(); });
+  document.fonts.load('100px Ultra').then(() => {
+    layout();
+    svg.classList.add('ready');
+  });
+})();
+</script>
+</body>
+</html>
