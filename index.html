@@ -83,7 +83,7 @@
       m.setAttribute('width', w * 3); m.setAttribute('height', h * 3);
     }
 
-    const size = Math.min(w * 0.117, h * 0.144);
+    const size = Math.min(w * 0.0995, h * 0.1224);
     for (const t of [g, s]) { t.setAttribute('font-size', size); t.setAttribute('x', 0); t.setAttribute('y', 0); }
     const gb = g.getBBox(), sb = s.getBBox();
     const overlap = Math.min(gb.width, sb.width) * OVERLAP;
