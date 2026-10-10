@@ -57,7 +57,7 @@
 </svg>
 <script>
 (() => {
-  const OVERLAP = 0.234;  // share of the narrower letter's width that overlaps at rest
+  const OVERLAP = 0.269;  // share of the narrower letter's width that overlaps at rest
   const OFFSCREEN = 0.5;  // share of each letter's width that drifts past the screen edge
   const APART_MS = 2600;
   const TOGETHER_MS = 900;
@@ -83,7 +83,7 @@
       m.setAttribute('width', w * 3); m.setAttribute('height', h * 3);
     }
 
-    const size = Math.min(w * 0.167, h * 0.206);
+    const size = Math.min(w * 0.117, h * 0.144);
     for (const t of [g, s]) { t.setAttribute('font-size', size); t.setAttribute('x', 0); t.setAttribute('y', 0); }
     const gb = g.getBBox(), sb = s.getBBox();
     const overlap = Math.min(gb.width, sb.width) * OVERLAP;
