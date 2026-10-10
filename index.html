@@ -87,10 +87,17 @@
         <mask id="not-s" maskUnits="userSpaceOnUse">
           <rect class="mask-bg" fill="#fff"/><use href="#s" fill="#000"/>
         </mask>
+        <!-- Horizontal-only blur for the collision. Kept attached at 0 between crashes:
+             attaching it on the fly made the first crashes stutter -->
+        <filter id="crash-blur" x="-20%" y="-10%" width="140%" height="120%">
+          <feGaussianBlur id="crash-blur-amount" stdDeviation="0 0"/>
+        </filter>
       </defs>
       <!-- Each letter is masked by the other, so the overlap shows the background -->
-      <use class="letter" href="#g" mask="url(#not-s)"/>
-      <use class="letter" href="#s" mask="url(#not-g)"/>
+      <g id="letters" filter="url(#crash-blur)">
+        <use class="letter" href="#g" mask="url(#not-s)"/>
+        <use class="letter" href="#s" mask="url(#not-g)"/>
+      </g>
     </svg>
   </h1>
   <button id="hit" type="button" aria-label="Invert colours" aria-pressed="false"></button>
@@ -107,18 +114,22 @@
   const TOGETHER_MS = 900;  // linear, so the letters hit at full speed
   const IMPACT_MS = 450;     // squash-and-rebound after the letters collide
   const IMPACT_DEPTH = 0.05; // how far each letter pushes into the other, × font size
+  const CRASH_BLUR = 0.03;   // peak horizontal blur at the moment of impact, × font size
+  const BLUR_FROM = 0.6;     // blur starts building at this point of the return trip
 
   const root = document.documentElement;
   const svg = document.getElementById('stage');
   const g = document.getElementById('g');
   const s = document.getElementById('s');
   const hit = document.getElementById('hit');
+  const blurAmount = document.getElementById('crash-blur-amount');
   const themeColor = document.querySelector('meta[name=theme-color]');
   const ease = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
 
   let gx = 0, sx = 0, gMax = 0, sMax = 0, d = 0, raf = 0; // d: 0 together → 1 apart
   let size = 0, bump = 0; // bump: extra outward offset (px) during the impact wobble
+  let blur = 0;           // 0–1 share of CRASH_BLUR
 
   function letterSize(w, h) {
     let size = SIZES[SIZES.length - 1][1];
@@ -165,10 +176,11 @@
   function place() {
     g.setAttribute('x', gx - d * gMax - bump);
     s.setAttribute('x', sx + d * sMax + bump);
+    blurAmount.setAttribute('stdDeviation', `${blur * CRASH_BLUR * size} 0`);
   }
 
   // Tween from wherever the letters are now, so interrupted moves stay smooth
-  function moveTo(target, ms, curve, onDone) {
+  function moveTo(target, ms, curve, onDone, blurAt = () => 0) {
     cancelAnimationFrame(raf);
     bump = 0;
     const from = d, t0 = performance.now();
@@ -176,6 +188,7 @@
     const step = now => {
       const t = dur ? Math.min(1, (now - t0) / dur) : 1;
       d = from + (target - from) * curve(t);
+      blur = dur ? blurAt(t) : 0;
       place();
       if (t < 1) raf = requestAnimationFrame(step);
       else if (onDone && dur) onDone(now);
@@ -190,6 +203,7 @@
     const step = now => {
       const t = Math.min(1, (now - t0) / IMPACT_MS);
       bump = t < 1 ? -depth * Math.exp(-5 * t) * Math.sin(3 * Math.PI * t) : 0;
+      blur = t < 1 ? Math.exp(-8 * t) : 0; // fades out quickly as the letters settle
       place();
       if (t < 1) raf = requestAnimationFrame(step);
     };
@@ -197,8 +211,12 @@
   }
 
   const apart = () => moveTo(1, APART_MS, ease);
-  // Skip the impact if the letters had barely separated
-  const together = () => moveTo(0, TOGETHER_MS, t => t, d > 0.03 ? impact : null);
+  // Skip the impact (and its blur) if the letters had barely separated
+  const together = () => {
+    const crash = d > 0.03;
+    moveTo(0, TOGETHER_MS, t => t, crash ? impact : null,
+      t => crash && t > BLUR_FROM ? ((t - BLUR_FROM) / (1 - BLUR_FROM)) ** 2 : 0);
+  };
 
   // Mouse: hover drifts. Touch: press and hold drifts, a quick tap swaps colours.
   // Keyboard: focusing the letters drifts, Enter/Space swaps colours.
