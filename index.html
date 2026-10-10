@@ -57,10 +57,10 @@
 </svg>
 <script>
 (() => {
-  const OVERLAP = 0.13;   // share of the narrower letter's width that overlaps at rest
-  const GAP = 0.14;       // extra space each letter drifts past touching, × font size
-  const APART_MS = 1600;
-  const TOGETHER_MS = 750;
+  const OVERLAP = 0.156;  // share of the narrower letter's width that overlaps at rest
+  const OFFSCREEN = 0.5;  // share of each letter's width that drifts past the screen edge
+  const APART_MS = 2600;
+  const TOGETHER_MS = 900;
 
   const svg = document.getElementById('stage');
   const g = document.getElementById('g');
@@ -69,7 +69,7 @@
   const ease = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
 
-  let gx = 0, sx = 0, maxD = 0, d = 0, raf = 0;
+  let gx = 0, sx = 0, gMax = 0, sMax = 0, d = 0, raf = 0; // d: 0 together → 1 apart
 
   function layout() {
     const w = innerWidth, h = innerHeight;
@@ -83,7 +83,7 @@
       m.setAttribute('width', w * 3); m.setAttribute('height', h * 3);
     }
 
-    const size = Math.min(w * 0.34, h * 0.42);
+    const size = Math.min(w * 0.238, h * 0.294);
     for (const t of [g, s]) { t.setAttribute('font-size', size); t.setAttribute('x', 0); t.setAttribute('y', 0); }
     const gb = g.getBBox(), sb = s.getBBox();
     const overlap = Math.min(gb.width, sb.width) * OVERLAP;
@@ -93,7 +93,8 @@
 
     gx = left - gb.x;
     sx = left + gb.width - overlap - sb.x;
-    maxD = overlap / 2 + size * GAP;
+    gMax = left + gb.width * OFFSCREEN;
+    sMax = w - (left + total) + sb.width * OFFSCREEN;
     g.setAttribute('y', baseline);
     s.setAttribute('y', baseline);
 
@@ -105,15 +106,15 @@
   }
 
   function place() {
-    g.setAttribute('x', gx - d);
-    s.setAttribute('x', sx + d);
+    g.setAttribute('x', gx - d * gMax);
+    s.setAttribute('x', sx + d * sMax);
   }
 
   // Tween from wherever the letters are now, so interrupted moves stay smooth
   function moveTo(target, ms) {
     cancelAnimationFrame(raf);
     const from = d, t0 = performance.now();
-    const dur = reduced.matches ? 0 : ms * Math.abs(target - from) / (maxD || 1);
+    const dur = reduced.matches ? 0 : ms * Math.abs(target - from);
     const step = now => {
       const t = dur ? Math.min(1, (now - t0) / dur) : 1;
       d = from + (target - from) * ease(t);
@@ -122,7 +123,7 @@
     };
     raf = requestAnimationFrame(step);
   }
-  const apart = () => moveTo(maxD, APART_MS);
+  const apart = () => moveTo(1, APART_MS);
   const together = () => moveTo(0, TOGETHER_MS);
 
   // Mouse: hover drifts. Touch: press and hold drifts, a quick tap swaps colours.
