@@ -4,12 +4,37 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Good Spacing</title>
-<meta name="description" content="Good Spacing">
+<meta name="description" content="Good Spacing. Coming soon.">
+<link rel="canonical" href="https://goodspacing.design/">
 <meta name="theme-color" content="#f4f2ee">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Ultra&display=block" rel="stylesheet">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Good Spacing">
+<meta property="og:title" content="Good Spacing">
+<meta property="og:description" content="Good Spacing. Coming soon.">
+<meta property="og:url" content="https://goodspacing.design/">
+<meta property="og:image" content="https://goodspacing.design/og-image.jpg">
+<meta property="og:image:type" content="image/jpeg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The Good Spacing monogram: a heavy G and S overlapping on an off-white background.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Good Spacing">
+<meta name="twitter:description" content="Good Spacing. Coming soon.">
+<meta name="twitter:image" content="https://goodspacing.design/og-image.jpg">
+<meta name="twitter:image:alt" content="The Good Spacing monogram: a heavy G and S overlapping on an off-white background.">
+
+<link rel="icon" href="/favicon.ico" sizes="48x48">
+<link rel="icon" href="/icon-192.png" type="image/png" sizes="192x192">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="preload" href="/fonts/ultra-gs.woff2" as="font" type="font/woff2" crossorigin>
 <style>
+  /* Ultra by Astigmatic (Apache 2.0), subset to G and S. See /fonts/LICENSE.txt */
+  @font-face {
+    font-family: 'Ultra';
+    src: url('/fonts/ultra-gs.woff2') format('woff2');
+    font-display: block;
+  }
   :root {
     --ink: #1a1918;
     --paper: #f4f2ee;
@@ -25,66 +50,92 @@
     user-select: none;
     -webkit-touch-callout: none;
   }
+  h1 { margin: 0; }
   svg {
     position: fixed;
     inset: 0;
     width: 100%;
     height: 100%;
-    opacity: 0;
-    transition: opacity 900ms ease;
+    pointer-events: none;
   }
-  svg.ready { opacity: 1; }
-  .letter { fill: var(--ink); transition: fill var(--swap); pointer-events: none; }
-  #hit { fill: transparent; pointer-events: all; touch-action: none; }
+  .letter { fill: var(--ink); transition: fill var(--swap); }
+  /* Invisible control over the letters: hover/press target and keyboard focus */
+  #hit {
+    position: fixed;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    cursor: default;
+    touch-action: none;
+  }
+  #hit:focus { outline: none; }
+  #hit:focus-visible { outline: 2px solid var(--ink); outline-offset: 10px; }
 </style>
 </head>
 <body>
-<svg id="stage" role="img" aria-label="Good Spacing">
-  <defs>
-    <text id="g" font-family="Ultra" font-size="100">G</text>
-    <text id="s" font-family="Ultra" font-size="100">S</text>
-    <mask id="not-g" maskUnits="userSpaceOnUse">
-      <rect class="mask-bg" fill="#fff"/><use href="#g" fill="#000"/>
-    </mask>
-    <mask id="not-s" maskUnits="userSpaceOnUse">
-      <rect class="mask-bg" fill="#fff"/><use href="#s" fill="#000"/>
-    </mask>
-  </defs>
-  <!-- Each letter is masked by the other, so the overlap shows the background -->
-  <use class="letter" href="#g" mask="url(#not-s)"/>
-  <use class="letter" href="#s" mask="url(#not-g)"/>
-  <rect id="hit"/>
-</svg>
+<main>
+  <h1>
+    <svg id="stage" role="img" aria-label="Good Spacing">
+      <defs>
+        <text id="g" font-family="Ultra" font-size="100">G</text>
+        <text id="s" font-family="Ultra" font-size="100">S</text>
+        <mask id="not-g" maskUnits="userSpaceOnUse">
+          <rect class="mask-bg" fill="#fff"/><use href="#g" fill="#000"/>
+        </mask>
+        <mask id="not-s" maskUnits="userSpaceOnUse">
+          <rect class="mask-bg" fill="#fff"/><use href="#s" fill="#000"/>
+        </mask>
+      </defs>
+      <!-- Each letter is masked by the other, so the overlap shows the background -->
+      <use class="letter" href="#g" mask="url(#not-s)"/>
+      <use class="letter" href="#s" mask="url(#not-g)"/>
+    </svg>
+  </h1>
+  <button id="hit" type="button" aria-label="Invert colours" aria-pressed="false"></button>
+</main>
 <script>
 (() => {
+  // Letter size (px) at each width; linear between points, held flat outside them.
+  // 320 and 1440 are the design frames; wide screens top out at 1.2× desktop.
+  const SIZES = [[320, 64], [1440, 143], [2560, 143 * 1.2]];
+  const MAX_HEIGHT_SHARE = 0.16; // short screens: letters never exceed this share of height
   const OVERLAP = 0.269;  // share of the narrower letter's width that overlaps at rest
   const OFFSCREEN = 0.5;  // share of each letter's width that drifts past the screen edge
   const APART_MS = 2600;
   const TOGETHER_MS = 900;
 
+  const root = document.documentElement;
   const svg = document.getElementById('stage');
   const g = document.getElementById('g');
   const s = document.getElementById('s');
   const hit = document.getElementById('hit');
+  const themeColor = document.querySelector('meta[name=theme-color]');
   const ease = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
 
   let gx = 0, sx = 0, gMax = 0, sMax = 0, d = 0, raf = 0; // d: 0 together → 1 apart
 
+  function letterSize(w, h) {
+    let size = SIZES[SIZES.length - 1][1];
+    if (w <= SIZES[0][0]) size = SIZES[0][1];
+    else for (let i = 1; i < SIZES.length; i++) {
+      const [w0, s0] = SIZES[i - 1], [w1, s1] = SIZES[i];
+      if (w <= w1) { size = s0 + (s1 - s0) * (w - w0) / (w1 - w0); break; }
+    }
+    return Math.min(size, h * MAX_HEIGHT_SHARE);
+  }
+
   function layout() {
     const w = innerWidth, h = innerHeight;
     svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
-    for (const r of svg.querySelectorAll('.mask-bg')) {
-      r.setAttribute('x', -w); r.setAttribute('y', -h);
-      r.setAttribute('width', w * 3); r.setAttribute('height', h * 3);
-    }
-    for (const m of svg.querySelectorAll('mask')) {
-      m.setAttribute('x', -w); m.setAttribute('y', -h);
-      m.setAttribute('width', w * 3); m.setAttribute('height', h * 3);
+    for (const el of svg.querySelectorAll('mask, .mask-bg')) {
+      el.setAttribute('x', -w); el.setAttribute('y', -h);
+      el.setAttribute('width', w * 3); el.setAttribute('height', h * 3);
     }
 
-    // Floor keeps the letters readable on phones, where width-based sizing gets tiny
-    const size = Math.max(Math.min(w * 0.0995, h * 0.1224), Math.min(72, w * 0.2));
+    const size = letterSize(w, h);
     for (const t of [g, s]) { t.setAttribute('font-size', size); t.setAttribute('x', 0); t.setAttribute('y', 0); }
     const gb = g.getBBox(), sb = s.getBBox();
     const overlap = Math.min(gb.width, sb.width) * OVERLAP;
@@ -99,10 +150,12 @@
     g.setAttribute('y', baseline);
     s.setAttribute('y', baseline);
 
-    hit.setAttribute('x', left);
-    hit.setAttribute('y', h / 2 - gb.height / 2);
-    hit.setAttribute('width', total);
-    hit.setAttribute('height', gb.height);
+    Object.assign(hit.style, {
+      left: left + 'px',
+      top: (h - gb.height) / 2 + 'px',
+      width: total + 'px',
+      height: gb.height + 'px',
+    });
     place();
   }
 
@@ -128,6 +181,7 @@
   const together = () => moveTo(0, TOGETHER_MS);
 
   // Mouse: hover drifts. Touch: press and hold drifts, a quick tap swaps colours.
+  // Keyboard: focusing the letters drifts, Enter/Space swaps colours.
   let pressStart = 0, held = false;
   hit.addEventListener('pointerenter', e => { if (e.pointerType === 'mouse') apart(); });
   hit.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') together(); });
@@ -137,6 +191,8 @@
     held = true;
     apart();
   });
+  hit.addEventListener('focus', () => { if (hit.matches(':focus-visible')) apart(); });
+  hit.addEventListener('blur', together);
   const release = () => {
     if (!held) return;
     held = false;
@@ -146,20 +202,17 @@
   addEventListener('pointercancel', release);
   addEventListener('contextmenu', e => e.preventDefault());
 
-  addEventListener('click', e => {
+  addEventListener('click', () => {
     if (pressStart && performance.now() - pressStart > 300) { pressStart = 0; return; }
     pressStart = 0;
-    const root = document.documentElement;
-    root.classList.toggle('inverted');
-    document.querySelector('meta[name=theme-color]').content =
-      root.classList.contains('inverted') ? '#1a1918' : '#f4f2ee';
+    const inverted = root.classList.toggle('inverted');
+    hit.setAttribute('aria-pressed', inverted);
+    themeColor.content = inverted ? '#1a1918' : '#f4f2ee';
   });
 
-  addEventListener('resize', () => { layout(); });
-  document.fonts.load('100px Ultra').then(() => {
-    layout();
-    svg.classList.add('ready');
-  });
+  addEventListener('resize', layout);
+  // Font is preloaded with font-display: block, so the letters only paint once it is ready
+  document.fonts.load('100px Ultra').then(layout);
 })();
 </script>
 </body>

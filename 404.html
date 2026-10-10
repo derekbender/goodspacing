@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Page not found · Good Spacing</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#f4f2ee">
+<link rel="icon" href="/favicon.ico" sizes="48x48">
+<link rel="icon" href="/icon-192.png" type="image/png" sizes="192x192">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="preload" href="/fonts/ultra-gs.woff2" as="font" type="font/woff2" crossorigin>
+<style>
+  /* Ultra by Astigmatic (Apache 2.0), subset to G and S. See /fonts/LICENSE.txt */
+  @font-face {
+    font-family: 'Ultra';
+    src: url('/fonts/ultra-gs.woff2') format('woff2');
+    font-display: block;
+  }
+  :root { --ink: #1a1918; --paper: #f4f2ee; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+    letter-spacing: .02em;
+  }
+  main {
+    min-height: 100%;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: 28px;
+    padding: 24px;
+    box-sizing: border-box;
+    text-align: center;
+  }
+  a { color: inherit; }
+  .mark { display: block; border-radius: 6px; }
+  .mark:focus { outline: none; }
+  .mark:focus-visible, .home:focus-visible { outline: 2px solid var(--ink); outline-offset: 8px; }
+  .mark svg { display: block; width: clamp(88px, 12vw, 140px); height: auto; overflow: visible; }
+  .letter { fill: var(--ink); }
+  h1 { margin: 0; font-size: 14px; font-weight: 600; }
+  p { margin: 4px 0 0; }
+  .home { border-radius: 2px; text-underline-offset: 3px; }
+</style>
+</head>
+<body>
+<main>
+  <a class="mark" href="/" aria-label="Good Spacing home">
+    <!-- Same overlapping GS as the home page; letter positions set below once the font loads -->
+    <svg id="mark" viewBox="0 0 100 60" aria-hidden="true">
+      <defs>
+        <text id="g" font-family="Ultra" font-size="50">G</text>
+        <text id="s" font-family="Ultra" font-size="50">S</text>
+        <mask id="not-g" maskUnits="userSpaceOnUse" x="-100" y="-100" width="300" height="300">
+          <rect x="-100" y="-100" width="300" height="300" fill="#fff"/><use href="#g" fill="#000"/>
+        </mask>
+        <mask id="not-s" maskUnits="userSpaceOnUse" x="-100" y="-100" width="300" height="300">
+          <rect x="-100" y="-100" width="300" height="300" fill="#fff"/><use href="#s" fill="#000"/>
+        </mask>
+      </defs>
+      <use class="letter" href="#g" mask="url(#not-s)"/>
+      <use class="letter" href="#s" mask="url(#not-g)"/>
+    </svg>
+  </a>
+  <div>
+    <h1>Page not found</h1>
+    <p><a class="home" href="/">Go to goodspacing.design</a></p>
+  </div>
+</main>
+<script>
+  document.fonts.load('50px Ultra').then(() => {
+    const svg = document.getElementById('mark');
+    const g = document.getElementById('g'), s = document.getElementById('s');
+    const gb = g.getBBox(), sb = s.getBBox();
+    const overlap = Math.min(gb.width, sb.width) * 0.269;
+    const total = gb.width + sb.width - overlap;
+    g.setAttribute('x', -gb.x);
+    s.setAttribute('x', gb.width - overlap - sb.x);
+    g.setAttribute('y', -gb.y);
+    s.setAttribute('y', -gb.y);
+    svg.setAttribute('viewBox', `0 0 ${total} ${gb.height}`);
+  });
+</script>
+</body>
+</html>
